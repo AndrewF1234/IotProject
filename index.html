@@ -1,51 +1,169 @@
 <!DOCTYPE html>
 <html>
    <head>
-	<script>
-	        function toggleSVG(value) {
-              fetch('/update-svg', {
-                 method: 'POST',
-                 body: new URLSearchParams({
-                    case: value
-                 })
-              })
-              .then(response => {
-                 if (response.ok) {
-                    console.log('SVG time graph has been changed');
-                 }
-              })
-              .catch(error => {
-                 console.log('error check request');
-              });
+       <script src="https://d3js.org/d3.v7.min.js"></script>
+       <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+       <style>
+           body {
+               display: flex;
+               justify-content: center;
+               align-items: center;
+               height: 100vh;
            }
-           function updateSVGGraph() {
-              var xhr = new XMLHttpRequest();
-              xhr.open("GET", "link/readingValues/data.svg", true);
-              xhr.onreadystatechange = function() {
-                 if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                    var response = xhr.responseText;
-                    var svgContainer = document.getElementById("svgContainer");
-                    svgContainer.innerHTML = response;
-                }
-              };
-              xhr.send();
-           }
-	   updateSVGGraph();
-	   setInterval(updateSVGGraph(), 5000);
-	</script>
 
+           #container {
+               text-align: center;
+           }
+       </style>
    </head>
    <body>
-	     <h1>Code</h1>
-	     
+        <script>
+            var data;
+            var svg;
+            var xScale, yScale;
+            var width = 500, height = 400;
+            var topMargin = 50, sideMargin = 50, bottomMargin = 50;
+            var temperatureOneLine, temperatureTwoLine, humidityLine, luxLine;
+
+            d3.csv("link/readingValues/6-15-2023.csv").then(function(csvData) {
+                csvData.forEach(function(d) {
+                    d.date = new Date(d.date);
+                });
+
+                data = csvData;
+
+                initializeGraph();
+            });
+
+            function initializeGraph() {
+                svg = d3.select("div#graph")
+                    .append("svg")
+                    .attr("style", "outline: thick solid black;")
+                    .attr("width", width)
+                    .attr("height", height);
+
+                // Define the scales for x and y axes
+                xScale = d3.scaleTime()
+                    .domain(d3.extent(data, function(d) { return d.date; }))
+                    .range([0 + sideMargin,500 - sideMargin]);
+
+                yScale = d3.scaleLinear()
+                    .domain([0, d3.max(data, function(d) { return d3.max([d['Temperature'], d['Temperature 2'], d['Humidity'], d['Light Intensity(Lux)']]); })])
+                    .range([400 - bottomMargin, 0 + topMargin]);
+
+                // Define the line functions
+                temperatureOneLine = d3.line()
+                    .x(function(d) { return xScale(d.date); })
+                    .y(function(d) { return yScale(d['Temperature']); });
+
+                temperatureTwoLine = d3.line()
+                    .x(function(d) { return xScale(d.date); })
+                    .y(function(d) { return yScale(d['Temperature 2']); });
+
+                humidityLine = d3.line()
+                    .x(function(d) { return xScale(d.date); })
+                    .y(function(d) { return yScale(d['Humidity']); });
+
+                luxLine = d3.line()
+                    .x(function(d) { return xScale(d.date); })
+                    .y(function(d) { return yScale(d['Light Intensity(Lux)']); });
+
+                // Render the graph with initial sample size
+                renderGraph();
+            }
+
+            // Render the graph with the specified sample size
+            function renderGraph(samples = data.length) {
+                // Update the xScale and yScale domains
+                xScale.domain(d3.extent(data.slice(-samples), function(d) { return d.date; }));
+                yScale.domain([0, d3.max(data.slice(-samples), function(d) { return d3.max([d['Temperature'], d['Temperature 2'], d['Humidity'], d['Light Intensity(Lux)']]); })]);
+
+                // Remove previous graph
+                svg.selectAll("*").remove();
+
+                // Append the path elements for each line
+                svg.append("path")
+                    .datum(data.slice(-samples))
+                    .attr("d", temperatureOneLine)
+                    .style("fill", "none")
+                    .style("stroke", "blue");
+
+                svg.append("path")
+                    .datum(data.slice(-samples))
+                    .attr("d", temperatureTwoLine)
+                    .style("fill", "none")
+                    .style("stroke", "red");
+
+                svg.append("path")
+                    .datum(data.slice(-samples))
+                    .attr("d", humidityLine)
+                    .style("fill", "none")
+                    .style("stroke", "green");
+
+                svg.append("path")
+                    .datum(data.slice(-samples))
+                    .attr("d", luxLine)
+                    .style("fill", "none")
+                    .style("stroke", "orange");
+
+                // Add legend
+                svg.append("text")
+                    .attr("x", 400)
+                    .attr("y", 10)
+                    .attr("text-anchor", "end")
+                    .text("TemperatureOne (C)");
+
+                svg.append("text")
+                    .attr("x", 400)
+                    .attr("y", 30)
+                    .attr("text-anchor", "end")
+                    .text("TemperatureTwo (C)");
+
+                svg.append("text")
+                    .attr("x", 400)
+                    .attr("y", 50)
+                    .attr("text-anchor", "end")
+                    .text("Humidity (%)");
+
+                svg.append("text")
+                    .attr("x", 400)
+                    .attr("y", 70)
+                    .attr("text-anchor", "end")
+                    .text("Lux");
+            }
+
+
+            function toggleSVG(option) {
+                switch (option) {
+                    case "month":
+                        renderGraph(data.length);
+                        break;
+                    case "week":
+                        var weekSamples = Math.min(7 * 24 * 60 / 5, data.length);
+                        renderGraph(weekSamples);
+                        break;
+                    case "day":
+                        var daySamples = Math.min(24 * 60 / 5, data.length);
+                        renderGraph(daySamples);
+                        break;
+                    case "minute":
+                        var minuteSamples = Math.min(1 * 60 / 5, data.length);
+                        renderGraph(minuteSamples);
+                        break;
+                }
+            }
+        </script>
+
+        <h1>Code</h1>
+
         <button onclick="toggleSVG('month')">Month</button>
         <button onclick="toggleSVG('week')">Week</button>
         <button onclick="toggleSVG('day')">Day</button>
         <button onclick="toggleSVG('minute')">Minute</button>
-        <div id="svgContainer"></div>
-        <!-- <object data="link/readingValues/data.svg" type="image/svg+xml"></object> -->
+
+        <div id="graph"></div>
         <a href="link/readingValues/6-12-2023.csv" download>
-	     download
-	     </a>
+            download
+        </a>
    </body>
 </html>
