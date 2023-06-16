@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+   <head>
+	<script>
+	        function toggleSVG(value) {
+              fetch('/update-svg', {
+                 method: 'POST',
+                 body: new URLSearchParams({
+                    case: value
+                 })
+              })
+              .then(response => {
+                 if (response.ok) {
+                    console.log('SVG time graph has been changed');
+                 }
+              })
+              .catch(error => {
+                 console.log('error check request');
+              });
+           }
+           function updateSVGGraph() {
+              var xhr = new XMLHttpRequest();
+              xhr.open("GET", "link/readingValues/data.svg", true);
+              xhr.onreadystatechange = function() {
+                 if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    var response = xhr.responseText;
+                    var svgContainer = document.getElementById("svgContainer");
+                    svgContainer.innerHTML = response;
+                }
+              };
+              xhr.send();
+           }
+	   updateSVGGraph();
+	   setInterval(updateSVGGraph(), 5000);
+	</script>
+
+   </head>
+   <body>
+	     <h1>Code</h1>
+	     
+        <button onclick="toggleSVG('month')">Month</button>
+        <button onclick="toggleSVG('week')">Week</button>
+        <button onclick="toggleSVG('day')">Day</button>
+        <button onclick="toggleSVG('minute')">Minute</button>
+        <div id="svgContainer"></div>
+        <!-- <object data="link/readingValues/data.svg" type="image/svg+xml"></object> -->
+        <a href="link/readingValues/6-12-2023.csv" download>
+	     download
+	     </a>
+   </body>
+</html>
